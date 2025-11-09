@@ -1,0 +1,48 @@
+import numpy as np
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from tensorflow.keras.datasets import mnist
+from tensorflow.keras.layers import Flatten,Dense
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.models import Sequential
+
+(x_train,y_train),(x_test,y_test)=mnist.load_data()
+
+x_train=x_train/255
+x_test=x_test/255
+
+y_train=to_categorical(y_train,10)
+y_test=to_categorical(y_test,10)
+
+model = Sequential([
+    Flatten(input_shape=(28,28)),
+    Dense(128,activation='relu'),
+    Dense(64,activation='relu'),
+    Dense(10,activation='softmax'),
+          ])
+    
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'],
+             )
+history = model.fit(x_train,y_train,epochs=10,batch_size=128,validation_split=0.1,verbose=1)
+
+predictions = model.predict(x_test)
+
+import random
+idx = random.randint(0,len(x_test)-1)
+plt.imshow(x_test[idx],cmap='gray')
+plt.title(f"Predicted :{np.argmax(predictions[idx])}")
+plt.plot(history.history['accuracy'], label='Train')
+plt.plot(history.history['val_accuracy'], label='Val')
+plt.title('Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.show()
+plt.plot(history.history['loss'],label='Train_accuracy')
+plt.plot(history.history['val_loss'],label='val_accuracy')
+plt.title('accuracy')
+plt.xlabel('epochs')
+plt.ylabel('accuracy')
+plt.legend()
