@@ -1,0 +1,139 @@
+import tensorflow as tf
+import numpy as np
+
+# Training data (now NumPy arrays, not lists)
+X = np.array([[1.0], [2.0], [3.0]], dtype=float)
+y = np.array([[3.0], [5.0], [7.0]], dtype=float)
+
+# Simple model
+model = tf.keras.Sequential([tf.keras.layers.Dense(1)])
+model.compile(optimizer='sgd', loss='mse')
+model.fit(X, y, epochs=100, verbose=0)
+
+# Test
+print("Prediction for x=4:", model.predict(np.array([[4.0]]))[0][0])
+
+
+
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+# Set seed for consistent results
+torch.manual_seed(0)
+
+# Training data: y = 2x + 1
+X = torch.tensor([[1.0], [2.0], [3.0]])
+y = torch.tensor([[3.0], [5.0], [7.0]])
+
+# Define simple linear model
+model = nn.Linear(1, 1)
+
+# Define optimizer
+optimizer = optim.SGD(model.parameters(), lr=0.01)
+
+# Train the model
+for _ in range(200):
+    prediction = model(X)
+    loss = ((prediction - y) ** 2).mean()   # Mean Squared Error
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+# Test
+test = torch.tensor([[4.0]])
+print("Prediction for x=4:", model(test).item())
+
+
+
+
+
+
+
+
+
+
+
+
+
+# import tensorflow as tf
+# import numpy as np
+
+# a = tf.random.uniform(shape = [16,16],minval = 0,maxval = 101,dtype = tf.int32)
+# b = tf.random.uniform(shape = [16,16],minval = 0,maxval = 101,dtype = tf.int32)
+# print(tf.add(a,b))
+
+# print(tf.subtract(a,b))
+
+# print(tf.multiply(a,b))
+
+# print(tf.divide(a,b))
+
+# tf.matmul(a,b)
+
+# tf.transpose(a)
+
+# tf.reduce_mean(b)
+
+# c = tf.eye(num_rows = 16,dtype = tf.int32)
+# a+c
+
+# print(a[1:3,1:3])
+
+
+# model = tf.keras.Sequential([tf.keras.layers.Dense(1)])
+# model.compile(optimizer='adam', loss='mse')
+# model.fit(a, b, epochs=1000, verbose=1)
+
+# print("Prediction for x=1:", model.predict(tf.constant(np.full((1, 16), 1.0), dtype=tf.float32))[0][0])
+
+
+# import torch
+# import torch.nn as nn
+# import torch.optim as optim
+
+# # Data: 16 samples, each with 16 features → predict 16 targets
+# A = torch.randint(low=0, high=101, size=(16, 16), dtype=torch.float32)
+# B = torch.randint(low=0, high=101, size=(16, 16), dtype=torch.float32)
+
+# # (Optional) normalize to help training
+# A = A / 100.0
+# B = B / 100.0
+
+# # Model: 16 → 64 → 64 → 16
+# model = nn.Sequential(
+#     nn.Linear(16, 64),
+#     nn.ReLU(),
+#     nn.Linear(64, 64),
+#     nn.ReLU(),
+#     nn.Linear(64, 16)
+# )
+
+# criterion = nn.MSELoss()
+# optimizer = optim.Adam(model.parameters(), lr=1e-3)
+
+# # Train
+# model.train()
+# for epoch in range(500):
+#     optimizer.zero_grad()
+#     pred = model(A)          # (16,16) -> (16,16)
+#     loss = criterion(pred, B)
+#     loss.backward()
+#     optimizer.step()
+
+# # Test on a 16-d vector of 4.0 (also normalized)
+# model.eval()
+# with torch.no_grad():
+#     test = torch.full((1, 16), 1.0, dtype=torch.float32) / 100.0
+#     out = model(test)        # shape (1,16)
+#     print("Prediction for x=1 (first 5 dims):", out[0, :5].tolist())
+
+# print("Addition:\n", A + B)
+# print("\nSubtraction:\n", A - B)
+# print("\nElementwise Multiplication:\n", A * B)
+# print("\nMatrix Multiplication:\n", torch.mm(A, B))
+# print("\nDivision:\n", A / B)
+# print("\nTranspose:\n", A.T)
+# print("\nMean of A:", A.float().mean())
+# print("\nMax of B:", B.max())
