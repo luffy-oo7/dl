@@ -1,0 +1,221 @@
+# -----------------------------
+# Import Required Libraries
+# -----------------------------
+import tensorflow as tf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import DenseNet201
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+from tensorflow.keras.preprocessing import image
+from PIL import Image
+
+# -----------------------------
+# Define Dataset Paths (Local)
+# -----------------------------
+base_dir = r"/content/drive/MyDrive/Untitled folder/test_set-20251013T070744Z-1-001"
+train_dir = os.path.join(base_dir, "training_set")
+test_dir = os.path.join(base_dir, "test_set")
+
+# -----------------------------
+# Data Generators
+# -----------------------------
+train_datagen = ImageDataGenerator(
+    rescale=1./255,
+    rotation_range=25,
+    width_shift_range=0.2,
+    height_shift_range=0.2,
+    shear_range=0.2,
+    zoom_range=0.2,
+    horizontal_flip=True
+)
+
+test_datagen = ImageDataGenerator(rescale=1./255)
+
+train_generator = train_datagen.flow_from_directory(
+    train_dir,
+    target_size=(150,150),
+    batch_size=32,
+    class_mode='binary'
+)
+
+test_generator = test_datagen.flow_from_directory(
+    test_dir,
+    target_size=(150,150),
+    batch_size=32,
+    class_mode='binary'
+)
+
+print("Class Indices:", train_generator.class_indices)
+
+ -----------------------------
+# Build Model (Transfer Learning with DenseNet121)
+# -----------------------------
+base_model = DenseNet201(weights='imagenet', include_top=False, input_shape=(150,150,3))
+
+# Freeze base layers
+for layer in base_model.layers:
+    layer.trainable = False
+
+# Add custom layers
+x = base_model.output
+x = GlobalAveragePooling2D()(x)
+x = Dense(256, activation='relu')(x)
+x = Dropout(0.4)(x)
+predictions = Dense(1, activation='sigmoid')(x)
+
+model = Model(inputs=base_model.input, outputs=predictions)
+model.compile(optimizer=Adam(learning_rate=0.0001),
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+
+# -----------------------------
+# Plot Accuracy
+# -----------------------------
+plt.figure(figsize=(8,5))
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title("Training vs Validation Accuracy")
+plt.legend()
+plt.show()
+
+
+
+
+
+
+
+
+# #import libraries
+# import tensorflow as tf
+# from tensorflow.keras.preprocessing.image import ImageDataGenerator
+# from tensorflow.keras.applications import MobileNetV2
+# from tensorflow.keras.models import Model
+# from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
+# from tensorflow.keras.optimizers import Adam
+# import matplotlib.pyplot as plt
+# import os
+# import pandas as pd
+
+# import pandas as pd
+# from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+# train_dir = '/content/extracted_content/datasets_dog_breed_classification/train'
+# labels_file = '/content/extracted_content/datasets_dog_breed_classification/labels.csv'
+
+
+#df = pd.read_csv(labels_file)
+# df.columns = ['filename', 'label']
+
+# df['filename'] = df['filename'].astype(str) + '.jpg'
+
+# print(df.head())
+
+
+# # Data generators
+# train_datagen = ImageDataGenerator(rescale=1./255, validation_split=0.2)
+
+# train_generator = train_datagen.flow_from_dataframe(
+#     dataframe=df,
+#     directory=train_dir,
+#     x_col='filename',
+#     y_col='label',
+#     target_size=(224, 224),
+#     class_mode='categorical',
+#     batch_size=32,
+#     subset='training'
+# )
+
+# val_generator = train_datagen.flow_from_dataframe(
+#     dataframe=df,
+#     directory=train_dir,
+#     x_col='filename',
+#     y_col='label',
+#     target_size=(224, 224),
+#     class_mode='categorical',
+#     batch_size=32,
+#     subset='validation'
+# )
+
+from tensorflow.keras.models import Sequential
+# from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+
+# num_classes = len(train_generator.class_indices)
+
+# #CNN model
+# model = Sequential([
+#     Conv2D(32, (3,3), activation='relu', input_shape=(224, 224, 3)),
+#     MaxPooling2D(2,2),
+
+#     Conv2D(64, (3,3), activation='relu'),
+#     MaxPooling2D(2,2),
+
+#     Conv2D(128, (3,3), activation='relu'),
+#     MaxPooling2D(2,2),
+
+#     Flatten(),
+#     Dense(256, activation='relu'),
+#     Dropout(0.5),
+#     Dense(num_classes, activation='softmax')
+# ])
+
+# # Compiling
+# model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+# # Summary
+# model.summary()
+
+# # Training the model
+# history = model.fit(
+#     train_generator,
+#     validation_data=val_generator,
+#     epochs=10
+# )
+
+
+# import matplotlib.pyplot as plt
+
+# # Plotting accuracy
+# plt.plot(history.history['accuracy'], label='train_accuracy')
+# plt.plot(history.history['val_accuracy'], label='val_accuracy')
+# plt.title('Model Accuracy')
+# plt.xlabel('Epochs')
+# plt.ylabel('Accuracy')
+# plt.legend()
+# plt.show()
+
+# # Plotting loss
+# plt.plot(history.history['loss'], label='train_loss')
+# plt.plot(history.history['val_loss'], label='val_loss')
+# plt.title('Model Loss')
+# plt.xlabel('Epochs')
+# plt.ylabel('Loss')
+# plt.legend()
+# plt.show()
+
+
+# import numpy as np
+# from tensorflow.keras.preprocessing import image
+
+# # Function to predict the breed of an image
+# def predict_breed(img_path):
+#     img = image.load_img(img_path, target_size=(224, 224))
+#     img_array = image.img_to_array(img)
+#     img_array = np.expand_dims(img_array, axis=0)
+#     img_array /= 255.0 # Rescale the image
+
+#     predictions = model.predict(img_array)
+#     predicted_class_index = np.argmax(predictions)
+#     predicted_breed = list(train_generator.class_indices.keys())[list(train_generator.class_indices.values()).index(predicted_class_index)]
+#     confidence = predictions[0][predicted_class_index]
+
+#     return predicted_breed, confidence
+
+# # Example usage: Replace 'path/to/your/image.jpg' with the actual path to your image
+# img_path = '/content/extracted_content/datasets_dog_breed_classification/train/000bec180eb18c7604dcecc8fe0dba07.jpg' # Replace with your image path
+# predicted_breed, confidence = predict_breed(img_path)
+# print(f"Predicted Breed: {predicted_breed}")
+# print(f"Confidence: {confidence:.2f}")
