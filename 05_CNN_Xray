@@ -1,0 +1,61 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.layers import Flatten,Dense,Conv2D,MaxPooling2D
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+train_dir="Downloads/Pneumonia X Ray/train"
+
+test_dir="Downloads/Pneumonia X Ray/test"
+
+train_datagen=ImageDataGenerator(rescale=1/255)
+test_datagen=ImageDataGenerator(rescale=1/255)
+
+train_gen=train_datagen.flow_from_directory(
+    train_dir,target_size=(150,150),batch_size=128,class_mode='binary')
+
+test_gen=test_datagen.flow_from_directory(
+    test_dir,target_size=(150,150),batch_size=128,class_mode='binary')
+
+model = Sequential([
+    Conv2D(32,(3,3),activation='relu',input_shape=(150,150,3)),
+    MaxPooling2D(2,2),
+
+    Conv2D(32,(3,3),activation='relu'),
+    MaxPooling2D(2,2),
+
+    Conv2D(32,(3,3),activation='relu'),
+    MaxPooling2D(2,2),
+
+    Flatten(),
+    Dense(128,activation='relu'),
+    Dense(1,activation='sigmoid'),
+])  
+
+model.compile(optimizer='adam',
+              loss='binary_crossentropy',
+              metrics=['accuracy'],
+             )
+
+history = model.fit(train_gen,
+                    epochs=5,
+                    validation_data=test_gen,)
+
+predictions = model.predict(test_gen)
+
+import matplotlib.pyplot as plt
+def show_predictions(model, test_gen, class_names):
+    test_gen.reset()
+    x, y = next(test_gen)   # one batch
+    preds = (model.predict(x[:10]) > 0.5).astype(int).reshape(-1)
+
+    plt.figure(figsize=(15,5))
+    for i in range(10):
+        plt.subplot(2,5,i+1)
+        plt.imshow(x[i])
+        plt.title(f"P:{class_names[preds[i]]}\nT:{class_names[int(y[i])]}") 
+        plt.axis('off')
+    plt.show()
+
+class_names = ['Normal', 'Pneumonia']
+show_predictions(model, test_gen, class_names)
