@@ -1,0 +1,218 @@
+import pandas as pd
+import numpy as np
+from scipy import stats
+import tensorflow as tf
+import matplotlib.pyplot as plt
+import seaborn as sns
+from pylab import rcParams
+from sklearn.model_selection import train_test_split
+from keras.models import Model
+from keras.layers import Input, Dense, Dropout
+from keras.callbacks import ModelCheckpoint, EarlyStopping
+from keras import regularizers
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix, recall_score, accuracy_score, precision_score
+
+# ---- Plot styling ----
+sns.set(style='whitegrid', palette='muted', font_scale=1.5)
+rcParams['figure.figsize'] = 14, 8
+
+RANDOM_SEED = 42  # same value whenever you re-run
+LABELS = ["Normal", "Fraud"]
+
+# ---- Load data ----
+# Change the path if your file lives elsewhere
+df = pd.read_csv("Downloads/Credit Card Dataset-20221031T095748Z-001/Credit Card Dataset/creditcard.csv")
+
+
+print("Shape:", df.shape)
+print("Any nulls?:", df.isnull().values.any())
+
+# ---- Class distribution ----
+rcParams['figure.figsize'] = 6, 4
+count_classes = pd.Series(df['Class']).value_counts()
+count_classes.plot(kind='bar', rot=0)
+plt.title("Frequency by observation number")
+plt.xlabel("Class")
+plt.ylabel("Number of Observations")
+plt.ylim(0, 2000)
+plt.show()
+
+count_classes = pd.Series(df['Class']).value_counts()
+count_classes.plot(kind='pie', autopct='%1.2f%%')
+plt.title("Class Proportion")
+plt.ylabel("")
+plt.show()
+
+# ---- Scale Time and Amount ----
+sc = StandardScaler()
+df['Time'] = sc.fit_transform(df['Time'].values.reshape(-1, 1))
+df['Amount'] = sc.fit_transform(df['Amount'].values.reshape(-1, 1))
+
+# ---- Prepare arrays ----
+raw_data = df.values
+# last column is Class (0 normal, 1 fraud)
+labels = raw_data[:, -1]
+# features (everything except Class)
+data = raw_data[:, 0:-1]
+
+# ---- Train/test split (FIXED: added args) ----
+train_data, test_data, train_labels, test_labels = train_test_split(
+    data, labels, test_size=0.2, random_state=RANDOM_SEED, stratify=labels
+)
+
+# ---- Normalize to 0..1 based on train range ----
+min_val = tf.reduce_min(train_data)
+max_val = tf.reduce_max(train_data)
+train_data = (train_data - min_val) / (max_val - min_val)
+test_data = (test_data - min_val) / (max_val - min_val)
+train_data = tf.cast(train_data, tf.float32)
+test_data = tf.cast(test_data, tf.float32)
+
+# ---- Boolean masks ----
+train_labels = train_labels.astype(bool)
+test_labels = test_labels.astype(bool)
+
+normal_train_data = train_data[~train_labels]
+normal_test_data = test_data[~test_labels]
+fraud_train_data = train_data[train_labels]
+fraud_test_data = test_data[test_labels]
+
+print(" No. of records in Fraud Train Data=", len(fraud_train_data))
+print(" No. of records in Normal Train data=", len(normal_train_data))
+print(" No. of records in Fraud Test Data=", len(fraud_test_data))
+print(" No. of records in Normal Test data=", len(normal_test_data))
+
+# ---- Autoencoder hyperparams ----
+nb_epoch = 5
+batch_size = 64
+input_dim = normal_train_data.shape[1]  # number of columns (should be 30)
+encoding_dim = 14                       # 14 neurons in dense layer
+hidden_dim_1 = int(encoding_dim / 2)    # 7
+hidden_dim_2 = 4                        # second hidden layer
+learning_rate = 1e-7
+
+# ---- Model (Functional API, same as your PDF but fixed) ----
+input_layer = Input(shape=(input_dim, ))  # reduce dimension of input
+
+# Encoder
+encoder = Dense(
+    encoding_dim, activation="tanh",
+    activity_regularizer=regularizers.l2(learning_rate)
+)(input_layer)
+encoder = Dropout(0.2)(encoder)
+encoder = Dense(hidden_dim_1, activation='relu')(encoder)
+encoder = Dense(hidden_dim_2, activation=tf.nn.leaky_relu)(encoder)
+
+# Decoder
+decoder = Dense(hidden_dim_1, activation='relu')(encoder)
+decoder = Dropout(0.2)(decoder)
+decoder = Dense(encoding_dim, activation='relu')(decoder)
+decoder = Dense(input_dim, activation='tanh')(decoder)
+
+# Autoencoder
+autoencoder = Model(inputs=input_layer, outputs=decoder)
+autoencoder.summary()
+
+# ---- Callbacks (FIXED: completed the truncated line) ----
+cp = ModelCheckpoint(
+    filepath="autoencoder_fraud.h5",
+    monitor='val_loss',
+    mode='min',
+    save_best_only=True,
+    verbose=1
+)
+
+early_stop = EarlyStopping(
+    monitor='val_loss',
+    min_delta=0.0001,
+    patience=10,
+    verbose=1,
+    mode='min',
+    restore_best_weights=True
+)
+
+# ---- Compile & Train ----
+autoencoder.compile(
+    optimizer='adam',
+    loss='mean_squared_error',
+    metrics=['accuracy']
+)
+
+history = autoencoder.fit(
+    normal_train_data, normal_train_data,
+    epochs=nb_epoch,
+    batch_size=batch_size,
+    shuffle=True,
+    validation_data=(test_data, test_data),
+    verbose=1,
+    callbacks=[cp, early_stop]
+).history
+
+# ---- Plot losses ----
+plt.figure()
+plt.plot(history['loss'], linewidth=2, label='Train')
+plt.plot(history['val_loss'], linewidth=2, label='Test')
+plt.legend(loc='upper right')
+plt.title('Model loss')
+plt.ylabel('Loss')
+plt.xlabel('Epoch')
+plt.show()
+
+# ---- Predictions and reconstruction error ----
+test_x_predictions = autoencoder.predict(test_data)
+mse = np.mean(np.power(test_data - test_x_predictions, 2), axis=1)
+error_df = pd.DataFrame({
+    'Reconstruction_error': mse,
+    'True_class': test_labels
+})
+
+# ---- Visualize reconstruction error by class (FIXED broken plotting block) ----
+threshold_fixed = 0.0  # initial line (as in your PDF); we’ll compute a data-driven one below
+
+groups = error_df.groupby('True_class')
+fig, ax = plt.subplots(figsize=(12, 5))
+for name, group in groups:
+    ax.plot(
+        group.index,
+        group['Reconstruction_error'],
+        marker='o',
+        ms=2.5,
+        linestyle='',
+        label=f"Class {int(name)}"
+    )
+ax.hlines(threshold_fixed, xmin=ax.get_xlim()[0], xmax=ax.get_xlim()[1], colors="r", zorder=100, label="Initial threshold")
+ax.legend()
+plt.title("Reconstruction error for normal and fraud data")
+plt.ylabel("Reconstruction error")
+plt.xlabel("Data point index")
+plt.show()
+
+# ---- Choose threshold from NORMAL (class 0) errors (FIXED truncated line) ----
+threshold_fixed = np.percentile(
+    error_df.loc[error_df['True_class'] == 0, 'Reconstruction_error'].values,
+    95
+)
+print(f"Chosen Threshold (95th percentile of normal): {threshold_fixed}")
+
+# ---- Predictions vs threshold (FIXED missing parens) ----
+y_pred = np.array([1 if e > threshold_fixed else 0 for e in error_df['Reconstruction_error'].values], dtype=int)
+
+# ---- Confusion matrix ----
+conf_matrix = confusion_matrix(error_df['True_class'].astype(int), y_pred)
+
+plt.figure(figsize=(6, 6))
+sns.heatmap(conf_matrix, xticklabels=LABELS, yticklabels=LABELS, annot=True, fmt="d", cbar=False)
+plt.title("Confusion matrix")
+plt.ylabel('True class')
+plt.xlabel('Predicted class')
+plt.show()
+
+# ---- Metrics ----
+acc = accuracy_score(error_df['True_class'].astype(int), y_pred)
+rec = recall_score(error_df['True_class'].astype(int), y_pred)
+prec = precision_score(error_df['True_class'].astype(int), y_pred, zero_division=0)
+
+print(f"Accuracy:  {acc:.4f}")
+print(f"Recall:    {rec:.4f}")
+print(f"Precision: {prec:.4f}")
