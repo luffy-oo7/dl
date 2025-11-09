@@ -1,0 +1,118 @@
+import numpy as np
+
+# -------------------------------
+# Step 1: Prepare text dataset
+# -------------------------------
+text = "I Love AI"
+chars = sorted(list(set(text)))
+vocab_size = len(chars)
+
+# Mapping from char to index and vice versa
+char_to_idx = {ch: i for i, ch in enumerate(chars)}
+idx_to_char = {i: ch for ch, i in char_to_idx.items()}
+
+print("Characters:", chars)
+print("char_to_idx:", char_to_idx)
+
+# Convert entire sentence to indices
+data = [char_to_idx[ch] for ch in text]
+
+# -------------------------------
+# Step 2: Define RNN parameters
+# -------------------------------
+input_size = vocab_size
+hidden_size = 16
+output_size = vocab_size
+lr = 0.1
+
+Wxh = np.random.randn(hidden_size, input_size) * 0.01   # input → hidden
+Whh = np.random.randn(hidden_size, hidden_size) * 0.01  # hidden → hidden
+Why = np.random.randn(output_size, hidden_size) * 0.01  # hidden → output
+bh = np.zeros((hidden_size, 1))
+by = np.zeros((output_size, 1))
+
+# Activation functions
+def softmax(x):
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum(axis=0)
+
+# -------------------------------
+# Step 3: Training loop
+# -------------------------------
+epochs = 200000
+for epoch in range(epochs):
+    h_prev = np.zeros((hidden_size, 1))
+    total_loss = 0
+
+    for t in range(len(data) - 1):
+        # One-hot encode current and target characters
+        x = np.zeros((vocab_size, 1))
+        x[data[t]] = 1
+        target_idx = data[t + 1]
+        target = np.zeros((vocab_size, 1))
+        target[target_idx] = 1
+
+        # Forward pass
+        h = np.tanh(np.dot(Wxh, x) + np.dot(Whh, h_prev) + bh)
+        y = np.dot(Why, h) + by
+        p = softmax(y)
+
+        # Compute loss
+        loss = -np.log(p[target_idx, 0] + 1e-9)
+        total_loss += loss
+
+        # Backpropagation through time (1 step)
+        dy = p - target
+        dWhy = np.dot(dy, h.T)
+        dby = dy
+        dh = np.dot(Why.T, dy) * (1 - h ** 2)
+        dWxh = np.dot(dh, x.T)
+        dWhh = np.dot(dh, h_prev.T)
+        dbh = dh
+
+        # Update weights
+        Wxh -= lr * dWxh
+        Whh -= lr * dWhh
+        Why -= lr * dWhy
+        bh -= lr * dbh
+        by -= lr * dby
+
+        h_prev = h
+
+    if epoch % 20000 == 0:
+        print(f"Epoch {epoch}, Loss: {total_loss:.4f}")
+
+print("\n Training Complete!")
+
+# -------------------------------
+# Step 4: Test the trained RNN (predict next characters)
+# -------------------------------
+def predict_text(seed_text, length=20):
+    h_prev = np.zeros((hidden_size, 1))
+    input_char = seed_text[0]
+    generated = seed_text
+
+    for i in range(length):
+        x = np.zeros((vocab_size, 1))
+        if input_char in char_to_idx:
+            x[char_to_idx[input_char]] = 1
+
+        # Forward pass
+        h_prev = np.tanh(np.dot(Wxh, x) + np.dot(Whh, h_prev) + bh)
+        y = np.dot(Why, h_prev) + by
+        p = softmax(y)
+
+        # Sample next char based on probability
+        next_idx = np.random.choice(range(vocab_size), p=p.ravel())
+        next_char = idx_to_char[next_idx]
+
+        generated += next_char
+        input_char = next_char
+
+    return generated
+
+# -------------------------------
+# Step 5: Generate new text
+# -------------------------------
+print("\n Generating text:")
+print(predict_text("h", 30))
