@@ -1,0 +1,59 @@
+# importing libraries
+import tensorflow as tf
+from tensorflow.keras import layers, models, regularizers
+from tensorflow.keras.datasets import mnist
+import matplotlib.pyplot as plt
+
+
+(x_train, _), (x_test, _) = mnist.load_data()
+x_train = x_train.astype("float32") / 255.0
+x_test = x_test.astype("float32") / 255.0
+
+# Flatten 28x28 images into vectors of size 784
+x_train = x_train.reshape((len(x_train), -1))
+x_test = x_test.reshape((len(x_test), -1))
+
+
+# build simple autoencoder
+encoder_dim = 64
+
+# Encoder
+input_img = layers.Input(shape=(784,))
+# Encoder with sparsity
+encoded = layers.Dense(
+    encoder_dim,
+    activation='relu',
+    activity_regularizer=regularizers.l1(1e-5)
+)(input_img)
+
+
+# Decoder
+decoded = layers.Dense(784,activation='sigmoid')(encoded)
+
+# Autoencoder Model
+autoencoder = models.Model(input_img, decoded)
+autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
+
+autoencoder.fit(x_train, x_train,
+                epochs=20,
+                batch_size=256,
+                shuffle=True,
+                validation_data=(x_test, x_test))
+
+decoded_imgs = autoencoder.predict(x_test)
+
+n = 10
+plt.figure(figsize=(20, 4))
+for i in range(n):
+    # Original
+    ax = plt.subplot(2, n, i + 1)
+    plt.imshow(x_test[i].reshape(28, 28), cmap='gray')
+    plt.axis('off')
+
+    # Reconstructed
+    ax = plt.subplot(2, n, i + 1 + n)
+    plt.imshow(decoded_imgs[i].reshape(28, 28), cmap='gray')
+    plt.axis('off')
+
+plt.suptitle("Simple Autoencoder Reconstruction")
+plt.show()
